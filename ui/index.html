@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Federal Register RAG Agent</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 16px; color: #1a1a2e; font-size: 1.4rem; }
+    #chat-box {
+      width: 100%;
+      max-width: 750px;
+      flex: 1;
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      overflow-y: auto;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .user { background: #1a73e8; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .agent { background: #f1f3f4; color: #1a1a2e; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .loading { color: #999; font-style: italic; align-self: flex-start; font-size: 0.9rem; }
+    .agent a { color: #1a73e8; }
+    #input-area { width: 100%; max-width: 750px; display: flex; gap: 10px; margin-top: 12px; }
+    #query-input {
+      flex: 1; padding: 12px 16px;
+      border: 1px solid #ddd; border-radius: 8px;
+      font-size: 1rem; outline: none;
+    }
+    #query-input:focus { border-color: #1a73e8; }
+    #send-btn {
+      padding: 12px 24px; background: #1a73e8;
+      color: white; border: none; border-radius: 8px;
+      font-size: 1rem; cursor: pointer;
+    }
+    #send-btn:disabled { background: #aaa; cursor: not-allowed; }
+    #send-btn:hover:not(:disabled) { background: #1558b0; }
+  </style>
+</head>
+<body>
+  <h1>🏛️ Federal Register RAG Agent</h1>
+  <div id="chat-box">
+    <div class="message agent">
+      Hello! I can help you search US Federal Register documents.<br><br>
+      Try asking:<br>
+      • "Show me documents about safety"<br>
+      • "What did the Coast Guard publish recently?"<br>
+      • "Find documents from July 2026"
+    </div>
+  </div>
+  <div id="input-area">
+    <input type="text" id="query-input"
+      placeholder="Ask about Federal Register documents..."
+      onkeydown="if(event.key==='Enter') sendQuery()" />
+    <button id="send-btn" onclick="sendQuery()">Send</button>
+  </div>
+  <script>
+    const chatBox = document.getElementById('chat-box');
+    const input = document.getElementById('query-input');
+    const btn = document.getElementById('send-btn');
+
+    function formatText(text) {
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/!\[.*?\]\(.*?\)/g, '')
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>')
+        .replace(/\n/g, '<br>');
+    }
+
+    function addMessage(text, role) {
+      const div = document.createElement('div');
+      div.className = 'message ' + role;
+      if (role === 'agent') {
+        div.innerHTML = formatText(text);
+      } else {
+        div.textContent = text;
+      }
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return div;
+    }
+
+    async function sendQuery() {
+      const query = input.value.trim();
+      if (!query) return;
+      addMessage(query, 'user');
+      input.value = '';
+      btn.disabled = true;
+      const loadingDiv = addMessage('Agent is thinking...', 'loading');
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query })
+        });
+        const data = await response.json();
+        loadingDiv.remove();
+        addMessage(data.answer, 'agent');
+      } catch (err) {
+        loadingDiv.remove();
+        addMessage('Error: Could not reach the agent. Is the server running?', 'agent');
+      }
+      btn.disabled = false;
+      input.focus();
+    }
+  </script>
+</body>
+</html>
